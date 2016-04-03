@@ -1,0 +1,235 @@
+\documentclass[11pt, twocolumn]{article}
+\usepackage[total={6in, 8in}, margin=1.0in]{geometry}
+\usepackage{booktabs} % for nice tables
+\usepackage{longtable}
+\usepackage{lmodern}
+\usepackage{listings}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{wrapfig}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{microtype}
+\usepackage[toc,page]{appendix}
+%\usepackage{lineno}
+
+\usepackage{amssymb}
+\usepackage{tabularx}
+%\usepackage[paper=letterpaper,top=1in,bottom=1in,left=1in,right=1in]{geometry}
+
+\usepackage[T1]{fontenc}
+\usepackage[sc]{mathpazo}
+\linespread{1.02}
+
+\setlength\parindent{0pt}
+\setlength{\parskip}{7pt plus4mm minus3mm}
+\newcommand{\block}{\footnotesize $\blacksquare$ \normalsize}
+%\pagestyle{empty}
+\newcommand{\squeezeup}{\vspace{-5.5mm}}
+%\linenumbers
+
+\bibliographystyle{plain}
+
+\begin{document}
+\title{Bringing Spark and HPC to HEP Analysis}
+\author{Saba Sehrish \\ Fermi National Accelerator Laboratory \\ ssehrish@fnal.gov}
+\date{}
+\maketitle
+
+\thispagestyle{empty}
+
+\section*{Abstract}
+\squeezeup
+Experimental HEP is a compute- and data-intensive statistical science. 
+In our experience working with HEP scientists, it is repeatedly observed 
+that interactive, iterative and low-latency analysis of PBs of data is the 
+key to extract more science. HEP analysis is complex and consists of 
+several steps that take from days to weeks to complete. We describe 
+our experience of implementing an HEP analysis in Spark 
+and evaluate its performance on HPC resources.
+
+Track: Data Science \\
+Audience: Beginner, Intermediate technical talk \\
+\squeezeup
+\input{intro}
+\section{CMS Dark Matter Analysis}
+This CMS Dark Matter analysis focuses on searching for new types of 
+elementary particles. 
+While most of these searches consist of attempting to detect astrophysical 
+dark matter passing through detectors (direct searches), dark matter could 
+also be produced in collisions at the Large Hadron Collider (LHC) if its 
+constituent particles are of an appropriate mass. We carry out such a 
+search using the CMS detector at the LHC.
+
+This CMS Dark Matter analysis is using the Analysis Object Data (AOD) event 
+format that contain composite C++ objects, which describes the analysis products 
+of the reconstruction of either simulated or recorded collisions. 
+The data volume is about 200 TB, and it takes about a week to form ntuples. 
+ ntuples have a simple flat structure of vectors of basic types like integers and floats. 
+The analysis software framework BACON is used to produce ntuples. 
+
+This facilitates analysis without the need for full access to the framework 
+used to persist the C++ objects. The ntuples produced for this Dark Matter 
+analysis use case amount to 2 TB. On average, this process is performed 
+4 times a year, but can be executed much more frequent as needed. 
+The BACON ntuples are then used to analyze a specific channel of 
+the Dark Matter analysis use case, many in parallel. 
+The outputs of each team are plots and tables. 
+It takes \~1 day to process all BACON ntuples. 
+A straight-forward approach is to simply count signal and background events, 
+called cut-n-count. This is achieved by processing the BACON ntuples 
+and making optimized selection cuts. In the end, the required plots
+ and tables are produced to extract the physics results of the analysis.
+ Table~\ref{tab:1} shows different steps, input size and processing time. 
+ The purpose of our study is to evaluate Spark for such analysis. 
+%A more sophisticated approach is using machine learning techniques like multi-variate analysis approaches to separate signal and background. These require an intermediate step executed on subsets of the BACON ntuples to train the multi-variate technique and then apply it to the BACON ntuples. 
+
+\begin{table}[h]
+\begin{tabular}{ l | c | r }
+\hline
+  Steps & Input size & Processing time \\
+  \hline
+  Ntupling & 200 TB & ~ 1 week \\
+  \hline  Skimming \&  &2 TB  & ~ 1 day\\
+  Slimming & & \\
+  \hline  Analysis &  << 1 TB & 5-30 minutes\\
+  \hline
+\end{tabular}
+\caption{Input size and processing time for each step in 2015.}
+  \label{tab:1}
+  \end{table}
+
+%Once:%? Convert data and simulation into format suited for%interactive analysis (NTuples)%? Problem: too big for interactive analysis%? Once or several times:%? Skimming & Slimming: reduce number of events%and information content%? Analysts can explore data and simulation interactively%? General requirements%- Apply user queries on pre-calculated quantities%- Add user-specified calculations ? use for selection as%well
+
+\squeezeup
+\begin{figure}[htbp]
+\begin{center}
+ \includegraphics[scale=0.5]{flow}
+\caption{Frequency of each step in current analysis and our approach to 
+use Spark to implement each step. }
+\label{fig:flow}
+\end{center}
+\end{figure}
+\squeezeup
+
+%\section{Approach}
+%\squeezeup
+%
+%The input data is structured, and 
+%2. Skimming and Slimming using Scala at large scale and ASCII and R at small scale
+%3. Plots using SparkR
+
+%\squeezeup
+\section{Our approach using Spark}
+\squeezeup
+Spark allows for in-memory data processing, and is an attractive
+approach for the cases where repeated analysis is performed on the
+same data sets. Spark provides implicit parallelization of the
+physicists' data processing algorithms, thus providing the possibility
+of good scaling to large numbers of cores without requiring the
+physicists to master complex parallel programming techniques. This
+provides important ease of use for ``casual'' programmers, for whom
+the goal is rapid performance of analysis, who are usually not
+interested in developing specialized parallel programming
+skills.  A supported and tuned installation of Spark is
+available at NERSC~\cite{nersc-spark}, thus eliminating the need for 
+the user to master the installation and tuning of the complex Spark system.
+In the following discussion, we describe the pros and cons of using 
+different features of Spark. 
+
+\begin{enumerate}
+\item \textit{Input data format: } 
+ROOT is a software framework that provides facilities for ``data processing, 
+statistical analysis, visualization and storage'' for HEP experiments~\cite{rootweb}.
+The data stored by HEP experiments is not readily available in 
+
+\item \textit{Accessing data in Spark: }
+Why flat tables? 
+
+\item \textit{Join Operation: } We have 
+To perform the score calculations and classification, we needed one DataFrame with all 
+the required fields from both metadata and data files. 
+Hence, adding a new column to the DataFrame from another 
+DataFrame was a natural choice. However, it was discovered that Spark DataFrame 
+doesn't support adding a column from a different DataFrame, it only supports columns 
+within the same DataFrame. 
+
+\item \textit{Using \texttt{join} operation instead: } 
+In order to address the previous hurdle we attempted to use inner join, but the overhead of the 
+\texttt{join} operation was extremely overwhelming that we had to pre-process the data, and 
+make amendments to data files before copying them to Cori 
+
+\item \textit{Orchestration: } 
+In Spark, data distribution and task assignment
+  is abstracted from the user. There are functions available to
+  perform global reduction in a distributed environment, which can be
+  readily used.  Such a set-up provides ease-of-programming in a
+  distributed environment. It does mean, however, that the user has to
+  rely on system optimizations provided by Spark's implementation to
+  improve any performance.
+ 
+\item \textit{Scaling: } One of the concerns we have is the scaling 
+We did a scaling test using Spark; the idea is to 
+read $\approx 250$ GB of event data, apply some filter and use a reduction 
+operation. This is a very common pattern  The Spark implementation provided good
+  scaling without requiring any tuning to the implementation and
+  developer expertise in parallel algorithms.
+ 
+\item \textit{Application tuning: } All the transformations in Spark
+  are lazy, with delayed calculation of results. The transformations
+  applied to the base dataset e.g. a file are remembered by the system
+  and only computed when an action is carried out on the dataset.
+  This design enables Spark to run more efficiently. For example, it
+  can recognize that a dataset created through \texttt{map} will be
+  used in a reduce and return only the result of the reduce to the
+  driver, rather than the larger mapped dataset. Due to the lazy
+  evaluation, it is hard to isolate slow-performing tasks and report
+  timing for different stages. 
+
+%\item \textit{Wrapped types: } We used the Java DataFrame API, and
+%  most of the available operations for our implementation are
+%  available through the Java wrapped types. A lot of time was spent in
+%  boxing and unboxing.  It is well known that wrapped types perform
+%  much slower than the primitive types, as explained in
+%  ~\cite{effectivejava}. ``... Changing the declaration of sum from
+%  Long to long reduces the run-time from 43 seconds to 6.8 seconds on
+%  my machine. The lesson is clear: prefer primitives to boxed
+%  primitives, and watch out for unintentional autoboxing
+%  ...''~\cite{effectivejava}.  We did a test on Cori to compare the
+%  performance of Float and float by running a simple Java program
+%  based on the calculations of the classification algorithm, and
+%  observed a performance difference of $28\%$ in using unboxed types.
+%  Hence, we can achieve better performance with Spark if DataFrames
+%  used primitive types.
+%%[Boxed type test on Cori? 23 sec Vs 1 min 20 sec. ]
+%
+%
+%\item \textit{Vectorized linear algebra library: } We experienced slow
+%  performance for repetitive numerical computations in Spark due to
+%  unavailability of high performance linear algebra library.  In the
+%  MPI implementation, we used Armadillo, which is a high quality C++
+%  linear algebra library.  The use of advanced libraries without data
+%  conversions, and the ability to use vectorized hardware allowed MPI
+%  implementation to perform exceedingly well as compared with Spark.
+
+\end{enumerate}
+
+\textbf{Participation Statement}: I will attend the conference. 
+
+\section{Bio} 
+\squeezeup
+Saba Sehrish is a Computer Science Researcher 
+at Fermilab. She is currently working on something....
+\squeezeup
+\section{Collaborators} 
+\squeezeup
+Matteo Cremonesi, Oliver Gutsche, Jim Kowalkowski, 
+Cristina Mantilla, Marc Paterno, Jim Pivarski, Alexey Svyatkovskiy
+\squeezeup
+\scriptsize
+
+%Bibliography and References Cited
+\bibliography{earlycareerbib,ssio}
+
+\end{document}
