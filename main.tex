@@ -49,7 +49,7 @@ several steps that take from days to weeks to complete. We describe
 our experience of implementing an HEP analysis in Spark 
 and evaluate its performance on HPC resources.
 
-Track: Data Science \\
+Track: Data Science  \\
 Audience: Beginner, Intermediate technical talk \\
 \squeezeup
 \input{intro}
@@ -60,25 +60,23 @@ While most of these searches consist of attempting to detect astrophysical
 dark matter passing through detectors (direct searches), dark matter could 
 also be produced in collisions at the Large Hadron Collider (LHC) if its 
 constituent particles are of an appropriate mass. We carry out such a 
-search using the CMS detector at the LHC.
+search using the CMS detector at the LHC. 
 
-This CMS Dark Matter analysis is using the Analysis Object Data (AOD) event 
-format that contain composite C++ objects, which describes the analysis products 
-of the reconstruction of either simulated or recorded collisions. 
+This CMS Dark Matter analysis is using composite C++ objects, 
+which describes the analysis products of the reconstruction of either 
+simulated or recorded collisions. 
 The data volume is about 200 TB, and it takes about a week to form ntuples. 
  ntuples have a simple flat structure of vectors of basic types like integers and floats. 
-The analysis software framework BACON is used to produce ntuples. 
-
-This facilitates analysis without the need for full access to the framework 
-used to persist the C++ objects. The ntuples produced for this Dark Matter 
-analysis use case amount to 2 TB. On average, this process is performed 
+%The analysis software framework BACON is used to produce ntuples. 
+The ntuples undergo a process of skimming and slimming, and the data produced for this Dark Matter 
+analysis use case is 2 TB. On average, this process is performed 
 4 times a year, but can be executed much more frequent as needed. 
-The BACON ntuples are then used to analyze a specific channel of 
+These ntuples are then used to analyze a specific channel of 
 the Dark Matter analysis use case, many in parallel. 
 The outputs of each team are plots and tables. 
-It takes \~1 day to process all BACON ntuples. 
+It takes about 1 day to process all ntuples. 
 A straight-forward approach is to simply count signal and background events, 
-called cut-n-count. This is achieved by processing the BACON ntuples 
+called cut-n-count. This is achieved by processing the ntuples 
 and making optimized selection cuts. In the end, the required plots
  and tables are produced to extract the physics results of the analysis.
  Table~\ref{tab:1} shows different steps, input size and processing time. 
@@ -125,40 +123,53 @@ use Spark to implement each step. }
 \squeezeup
 Spark allows for in-memory data processing, and is an attractive
 approach for the cases where repeated analysis is performed on the
-same data sets. Spark provides implicit parallelization of the
-physicists' data processing algorithms, thus providing the possibility
-of good scaling to large numbers of cores without requiring the
-physicists to master complex parallel programming techniques. This
-provides important ease of use for ``casual'' programmers, for whom
-the goal is rapid performance of analysis, who are usually not
-interested in developing specialized parallel programming
-skills.  A supported and tuned installation of Spark is
-available at NERSC~\cite{nersc-spark}, thus eliminating the need for 
+same data sets. A supported and tuned installation of Spark is
+available at NERSC~\cite{nersc-spark}, and elimiates the need for 
 the user to master the installation and tuning of the complex Spark system.
 In the following discussion, we describe the pros and cons of using 
-different features of Spark. 
+different features of Spark. Figure~\ref{fig:flow} shows the mapping of 
+different steps in current analysis to the Spark framework. The conversion 
+step is extremely important because the structure of data defines 
+what APIs can be used later on in the Cut-N-Count analysis. 
 
 \begin{enumerate}
 \item \textit{Input data format: } 
-ROOT is a software framework that provides facilities for ``data processing, 
-statistical analysis, visualization and storage'' for HEP experiments~\cite{rootweb}.
-The data stored by HEP experiments is not readily available in 
+The first step to implement our use case in Spark is to convert the data in the form that 
+can be readily read in Spark DataFrames using native API as shown in Figure~\ref{fig:flow}. 
+The CMS data is stored in the form of ROOT trees~\cite{root}, which is the most common 
+data format in HEP but not accessible in Spark. 
+This data format is hierarchical and complex. Initially data is converted to either 
+JSON or ASCII for experimentation with sparkR and PySpark. 
+The nested object structure of the data made it extremely inconvenient to read 
+any data using the current API both with sparkR and pySpark. 
+Hence, we need a flattened table to effectively use the API. 
+Additionally, we are working to use AVRO and HDF5 data formats for the production. 
+The use of HDF5 will be extremely useful as it is one of the tuned and supported 
+parallel I/O libraries available on HPC machines. 
 
-\item \textit{Accessing data in Spark: }
-Why flat tables? 
-
-\item \textit{Join Operation: } We have 
-To perform the score calculations and classification, we needed one DataFrame with all 
-the required fields from both metadata and data files. 
-Hence, adding a new column to the DataFrame from another 
-DataFrame was a natural choice. However, it was discovered that Spark DataFrame 
-doesn't support adding a column from a different DataFrame, it only supports columns 
-within the same DataFrame. 
-
-\item \textit{Using \texttt{join} operation instead: } 
+\item \textit{Operations on multiple DataFrames: } 
+Currently we read data in multiple logical tables, e.g. every information regarding 
+electrons can be in one table, etc. The nature of analysis is to combine the data from different tables 
+and make several histograms for different particles. 
+In our experience, if we read data in multiple DataFrames, 
+adding a new column to the DataFrame from another 
+DataFrame is not supported in Spark. Spark only supports adding new columns within the same DataFrame. 
 In order to address the previous hurdle we attempted to use inner join, but the overhead of the 
-\texttt{join} operation was extremely overwhelming that we had to pre-process the data, and 
-make amendments to data files before copying them to Cori 
+\texttt{join} operation is extremely overwhelming that we are considering to pre-process the data, and 
+make amendments to data files before copying data to NERSC. 
+
+\item \textit{Spark Operations and scaling: } 
+This analysis requires skimming and slimming operation; Scala is a natural choice 
+to implement this operation; Spark is written in Scala, python will perform slow with large data sets.  
+The skimming and slimming operation involves the use of functions; \texttt{map}, \texttt{filter} and 
+\texttt{reduce}. 
+We have used Java in our initial study to perform filter and reduction 
+operation and understand the performance and scaling. Using a data set of size 250 GB, 
+with about 70 million events and applying a simple filter operation, 
+the Spark implementation provided good
+  scaling without requiring any tuning to the implementation and
+  developer expertise in parallel algorithms. 
+  %However, we are working to understand the performance.  
 
 \item \textit{Orchestration: } 
 In Spark, data distribution and task assignment
@@ -168,23 +179,25 @@ In Spark, data distribution and task assignment
   distributed environment. It does mean, however, that the user has to
   rely on system optimizations provided by Spark's implementation to
   improve any performance.
- 
-\item \textit{Scaling: } One of the concerns we have is the scaling 
-We did a scaling test using Spark; the idea is to 
-read $\approx 250$ GB of event data, apply some filter and use a reduction 
-operation. This is a very common pattern  The Spark implementation provided good
-  scaling without requiring any tuning to the implementation and
-  developer expertise in parallel algorithms.
- 
+% Spark provides implicit parallelization of the
+%physicists' data processing algorithms, thus providing the possibility
+%of good scaling to large numbers of cores without requiring the
+%physicists to master complex parallel programming techniques. This
+%provides important ease of use for ``casual'' programmers, for whom
+%the goal is rapid performance of analysis, who are usually not
+%interested in developing specialized parallel programming
+%skills.  
+% 
 \item \textit{Application tuning: } All the transformations in Spark
   are lazy, with delayed calculation of results. The transformations
   applied to the base dataset e.g. a file are remembered by the system
   and only computed when an action is carried out on the dataset.
-  This design enables Spark to run more efficiently. For example, it
-  can recognize that a dataset created through \texttt{map} will be
-  used in a reduce and return only the result of the reduce to the
-  driver, rather than the larger mapped dataset. Due to the lazy
-  evaluation, it is hard to isolate slow-performing tasks and report
+  This design enables Spark to run more efficiently. 
+%  For example, it
+%  can recognize that a dataset created through \texttt{map} will be
+%  used in a reduce and return only the result of the reduce to the
+%  driver, rather than the larger mapped dataset. 
+  Due to this lazy evaluation, it is hard to isolate slow-performing tasks and report
   timing for different stages. 
 
 %\item \textit{Wrapped types: } We used the Java DataFrame API, and
@@ -214,16 +227,18 @@ operation. This is a very common pattern  The Spark implementation provided good
 %  implementation to perform exceedingly well as compared with Spark.
 
 \end{enumerate}
-
-\textbf{Participation Statement}: I will attend the conference. 
-
-\section{Bio} 
 \squeezeup
+\textbf{Participation}: I will attend the conference. 
+
+\textbf{Bio:} 
 Saba Sehrish is a Computer Science Researcher 
-at Fermilab. She is currently working on something....
-\squeezeup
-\section{Collaborators} 
-\squeezeup
+at Fermilab. Prior to that she was a post doc at Northwestern University, 
+and did her PhD from University of Central Florida. 
+Her research interests include HPC and Big data computing for HEP analysis.  
+She is currently working on Spark and also a team member of the LArSoft 
+project at Fermilab. 
+
+\textbf{Collaborators: } 
 Matteo Cremonesi, Oliver Gutsche, Jim Kowalkowski, 
 Cristina Mantilla, Marc Paterno, Jim Pivarski, Alexey Svyatkovskiy
 \squeezeup
