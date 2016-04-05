@@ -1,5 +1,5 @@
 \documentclass[11pt, twocolumn]{article}
-\usepackage[total={6in, 8in}, margin=1.0in]{geometry}
+\usepackage[total={6in, 8in}, margin=0.75in]{geometry}
 \usepackage{booktabs} % for nice tables
 \usepackage{longtable}
 \usepackage{lmodern}
@@ -32,8 +32,8 @@
 \bibliographystyle{plain}
 
 \begin{document}
-\title{Bringing Spark and HPC to HEP Analysis}
-\author{Saba Sehrish \\ Fermi National Accelerator Laboratory \\ ssehrish@fnal.gov}
+\title{Bringing Spark and HPC to Experimental High Energy Physics Analyses}
+\author{Saba Sehrish \\ Computer Science Researcher\\ Fermi National Accelerator Laboratory \\ ssehrish@fnal.gov}
 \date{}
 \maketitle
 
@@ -41,42 +41,40 @@
 
 \section*{Abstract}
 \squeezeup
-Experimental HEP is a compute- and data-intensive statistical science. 
-In our experience working with HEP scientists, it is repeatedly observed 
-that interactive, iterative and low-latency analysis of PBs of data is the 
-key to extract more science. HEP analysis is complex and consists of 
-several steps that take from days to weeks to complete. We describe 
-our experience of implementing an HEP analysis in Spark 
-and evaluate its performance on HPC resources.
+Experimental HEP is a compute- and data-intensive statistical science, 
+in which interactive, iterative and low-latency analysis of PBs of data is the key to extracting more science. HEP analysis consists of several steps that take from days to weeks. We describe our experience implementing selected HEP analyses in Spark as an alternative to typical models, and evaluate Spark on HPC resources.
 
 Track: Data Science  \\
 Audience: Beginner, Intermediate technical talk \\
 \squeezeup
 \input{intro}
 \section{CMS Dark Matter Analysis}
-This CMS Dark Matter analysis focuses on searching for new types of 
+The CMS Dark Matter analysis focuses on searching for new types of 
 elementary particles. 
-While most of these searches consist of attempting to detect astrophysical 
-dark matter passing through detectors (direct searches), dark matter could 
-also be produced in collisions at the Large Hadron Collider (LHC) if its 
-constituent particles are of an appropriate mass. We carry out such a 
+While other experiment searches consist of attempting to detect astrophysical 
+dark matter passing through a detector (direct searches), dark matter could 
+also be produced in collisions at the LHC if its 
+constituent particles are of an appropriate mass. The CMS collaboration is carrying out such a 
 search using the CMS detector at the LHC. 
 
-This CMS Dark Matter analysis is using composite C++ objects, 
-which describes the analysis products of the reconstruction of either 
+The CMS dark matter analysis is using composite C++ objects, 
+which describe the analysis products of the reconstruction of either 
 simulated or recorded collisions. 
-The data volume is about 200 TB, and it takes about a week to form ntuples. 
- ntuples have a simple flat structure of vectors of basic types like integers and floats. 
-%The analysis software framework BACON is used to produce ntuples. 
-The ntuples undergo a process of skimming and slimming, and the data produced for this Dark Matter 
-analysis use case is 2 TB. On average, this process is performed 
-4 times a year, but can be executed much more frequent as needed. 
-These ntuples are then used to analyze a specific channel of 
-the Dark Matter analysis use case, many in parallel. 
-The outputs of each team are plots and tables. 
-It takes about 1 day to process all ntuples. 
-A straight-forward approach is to simply count signal and background events, 
-called cut-n-count. This is achieved by processing the ntuples 
+The data volume to be analyzed is about 200 TB, but not organized for end-user analysis. 
+This complex data format is converted to a simplified tabular data structure, called as n-tuples. 
+These n-tuples have a simple flat structure of vectors of basic types like integers and floats. 
+Making n-tuples is a time consuming process and it takes about a week to form n-tuples as 
+shown in Table~\ref{tab:1}.   
+
+Due to the large volume and significant processing time, the n-tuples are not used directly in the end-user analysis and undergo a process of skimming and slimming 
+(either an event is made smaller or some events are dropped). 
+This process reduces the data volume to 2 TB and takes about a day. 
+On average, this process is performed 4 times a year, but can be executed much more frequently as needed. 
+
+These reduced n-tuples are then used to analyze a specific channel of 
+the Dark Matter analysis use case. The outputs of each analysis are plots and tables. 
+An example of end-user analysis is to count signal and background events, 
+called ``cut-n-count''. This is achieved by processing the n-tuples 
 and making optimized selection cuts. In the end, the required plots
  and tables are produced to extract the physics results of the analysis.
  Table~\ref{tab:1} shows different steps, input size and processing time. 
@@ -89,16 +87,29 @@ and making optimized selection cuts. In the end, the required plots
   Steps & Input size & Processing time \\
   \hline
   Ntupling & 200 TB & ~ 1 week \\
-  \hline  Skimming \&  &2 TB  & ~ 1 day\\
+  \hline
+  Skimming \&  &2 TB  & ~ 1 day\\
   Slimming & & \\
-  \hline  Analysis &  << 1 TB & 5-30 minutes\\
+  \hline
+  Analysis &  << 1 TB & 5-30 minutes\\
   \hline
 \end{tabular}
 \caption{Input size and processing time for each step in 2015.}
   \label{tab:1}
   \end{table}
 
-%Once:%? Convert data and simulation into format suited for%interactive analysis (NTuples)%? Problem: too big for interactive analysis%? Once or several times:%? Skimming & Slimming: reduce number of events%and information content%? Analysts can explore data and simulation interactively%? General requirements%- Apply user queries on pre-calculated quantities%- Add user-specified calculations ? use for selection as%well
+%Once:
+%? Convert data and simulation into format suited for
+%interactive analysis (NTuples)
+%? Problem: too big for interactive analysis
+%? Once or several times:
+%? Skimming & Slimming: reduce number of events
+%and information content
+%? Analysts can explore data and simulation interactively
+%? General requirements
+%- Apply user queries on pre-calculated quantities
+%- Add user-specified calculations ? use for selection as
+%well
 
 \squeezeup
 \begin{figure}[htbp]
@@ -109,7 +120,7 @@ use Spark to implement each step. }
 \label{fig:flow}
 \end{center}
 \end{figure}
-\squeezeup
+%\squeezeup
 
 %\section{Approach}
 %\squeezeup
@@ -121,54 +132,67 @@ use Spark to implement each step. }
 %\squeezeup
 \section{Our approach using Spark}
 \squeezeup
-Spark allows for in-memory data processing, and is an attractive
+Spark allows for in-memory distributed data processing, and is an attractive
 approach for the cases where repeated analysis is performed on the
 same data sets. A supported and tuned installation of Spark is
-available at NERSC~\cite{nersc-spark}, and elimiates the need for 
+available at NERSC~\cite{nersc-spark}, which eliminates the need for 
 the user to master the installation and tuning of the complex Spark system.
 In the following discussion, we describe the pros and cons of using 
-different features of Spark. Figure~\ref{fig:flow} shows the mapping of 
-different steps in current analysis to the Spark framework. The conversion 
+different features of Spark. Most of these observations will be applicable 
+to other scientific domains. Figure~\ref{fig:flow} shows the mapping of 
+different steps in the CMS dark matter analysis to the Spark framework. The conversion 
 step is extremely important because the structure of data defines 
-what APIs can be used later on in the Cut-N-Count analysis. 
+what APIs can be used later on in the cut-n-count analysis. 
 
 \begin{enumerate}
 \item \textit{Input data format: } 
-The first step to implement our use case in Spark is to convert the data in the form that 
-can be readily read in Spark DataFrames using native API as shown in Figure~\ref{fig:flow}. 
+Our first step is to convert the data to a form that 
+can be readily read in Spark DataFrames as shown in Figure~\ref{fig:flow}. 
 The CMS data is stored in the form of ROOT trees~\cite{root}, which is the most common 
-data format in HEP but not accessible in Spark. 
-This data format is hierarchical and complex. Initially data is converted to either 
-JSON or ASCII for experimentation with sparkR and PySpark. 
-The nested object structure of the data made it extremely inconvenient to read 
-any data using the current API both with sparkR and pySpark. 
-Hence, we need a flattened table to effectively use the API. 
-Additionally, we are working to use AVRO and HDF5 data formats for the production. 
+data format in HEP, which are not accessible in Spark. 
+The ROOT data format is hierarchical and complex and Spark DataFrames are tabular. 
+%Initially data is converted to either JSON or ASCII for experimentation with sparkR and PySpark. 
+%The nested object structure of the data made it extremely inconvenient to read 
+%any data using the current API both with sparkR and pySpark. 
+Hence, we need flattened tables to effectively use the API. 
+Additionally, we are working to use Avro and HDF5 data formats for this project. 
 The use of HDF5 will be extremely useful as it is one of the tuned and supported 
 parallel I/O libraries available on HPC machines. 
 
 \item \textit{Operations on multiple DataFrames: } 
-Currently we read data in multiple logical tables, e.g. every information regarding 
-electrons can be in one table, etc. The nature of analysis is to combine the data from different tables 
-and make several histograms for different particles. 
-In our experience, if we read data in multiple DataFrames, 
+Currently we read data in multiple logical tables, e.g. all information regarding 
+a given reconstructed particle type can be found in one table. The nature of this analysis is to 
+combine the data from different tables 
+and make several histograms for different particles properties. 
+In our experience, if we read data from multiple DataFrames, 
 adding a new column to the DataFrame from another 
-DataFrame is not supported in Spark. Spark only supports adding new columns within the same DataFrame. 
-In order to address the previous hurdle we attempted to use inner join, but the overhead of the 
-\texttt{join} operation is extremely overwhelming that we are considering to pre-process the data, and 
-make amendments to data files before copying data to NERSC. 
+DataFrame is not supported within Spark. Spark only supports adding new columns within the same DataFrame. 
+We also use inner joins to combine the DataFrames, but the overhead of the 
+\texttt{join} operation is extremely overwhelming and we are investigating this issue. % that we are considering to pre-process the data, and 
+%make amendments to data files before copying data to NERSC. 
 
-\item \textit{Spark Operations and scaling: } 
-This analysis requires skimming and slimming operation; Scala is a natural choice 
-to implement this operation; Spark is written in Scala, python will perform slow with large data sets.  
+\item \textit{Spark Operations and API: } 
+This analysis requires skimming and slimming operation. 
 The skimming and slimming operation involves the use of functions; \texttt{map}, \texttt{filter} and 
 \texttt{reduce}. 
-We have used Java in our initial study to perform filter and reduction 
-operation and understand the performance and scaling. Using a data set of size 250 GB, 
-with about 70 million events and applying a simple filter operation, 
+Scala is a natural choice to implement this operation; Spark is written in Scala and it should out-perform Python on large data sets.  
+ Spark provides implicit parallelization of the
+physicists' data processing algorithms using these functions, thus providing the possibility
+of good scaling to large numbers of cores without requiring the
+physicists to master complex parallel programming techniques. This
+provides important ease of use for ``casual'' programmers, for whom
+the goal is rapid turnaround time for analysis, who are usually not
+interested in developing specialized parallel programming
+skills. The availability of Python and R interface for end user analyses is also a key feature desired by the HEP community. 
+ 
+\item \textit{Scaling: }
+We have used Java in our initial experience with Spark to perform filter and reduction 
+operation and understand the performance and scaling on Cori (NERSC). Using a data set of size 250 GB, 
+with about 70 million records and applying a simple filter operation, 
 the Spark implementation provided good
-  scaling without requiring any tuning to the implementation and
+  scaling without requiring either tuning of the implementation or
   developer expertise in parallel algorithms. 
+  
   %However, we are working to understand the performance.  
 
 \item \textit{Orchestration: } 
@@ -179,18 +203,10 @@ In Spark, data distribution and task assignment
   distributed environment. It does mean, however, that the user has to
   rely on system optimizations provided by Spark's implementation to
   improve any performance.
-% Spark provides implicit parallelization of the
-%physicists' data processing algorithms, thus providing the possibility
-%of good scaling to large numbers of cores without requiring the
-%physicists to master complex parallel programming techniques. This
-%provides important ease of use for ``casual'' programmers, for whom
-%the goal is rapid performance of analysis, who are usually not
-%interested in developing specialized parallel programming
-%skills.  
-% 
+
 \item \textit{Application tuning: } All the transformations in Spark
   are lazy, with delayed calculation of results. The transformations
-  applied to the base dataset e.g. a file are remembered by the system
+  applied to the base dataset are remembered by the system
   and only computed when an action is carried out on the dataset.
   This design enables Spark to run more efficiently. 
 %  For example, it
@@ -232,10 +248,10 @@ In Spark, data distribution and task assignment
 
 \textbf{Bio:} 
 Saba Sehrish is a Computer Science Researcher 
-at Fermilab. Prior to that she was a post doc at Northwestern University, 
-and did her PhD from University of Central Florida. 
+at Fermilab. She did her post doc at Northwestern University
+and PhD at University of Central Florida. 
 Her research interests include HPC and Big data computing for HEP analysis.  
-She is currently working on Spark and also a team member of the LArSoft 
+She is currently working on Spark for HEP and also a team member of the LArSoft 
 project at Fermilab. 
 
 \textbf{Collaborators: } 
